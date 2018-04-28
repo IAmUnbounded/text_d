@@ -42,9 +42,9 @@ def save_image(np_arr, path):
 
 
 def load_images(path, n_images):
-    if n_images < 0:
-        n_images = float("inf")
-    A_paths, B_paths = os.path.join(path, 'A'), os.path.join(path, 'B')
+    #if n_images < 0:
+    #    n_images = float("inf")
+    A_paths, B_paths = os.path.join(path, 'data'), os.path.join(path, 'blur')
     all_A_paths, all_B_paths = list_image_files(A_paths), list_image_files(B_paths)
     images_A, images_B = [], []
     images_A_paths, images_B_paths = [], []
@@ -54,6 +54,7 @@ def load_images(path, n_images):
         images_B.append(preprocess_image(img_B))
         images_A_paths.append(path_A)
         images_B_paths.append(path_B)
+        print(len(images_A))
         if len(images_A) > n_images - 1: break
 
     return {

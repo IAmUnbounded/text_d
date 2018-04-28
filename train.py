@@ -2,15 +2,29 @@ import os
 import datetime
 import click
 import numpy as np
-
 from utils import load_images
 from losses import wasserstein_loss, perceptual_loss
 from model import generator_model, discriminator_model, generator_containing_discriminator_multiple_outputs
-
+import glob
 from keras.optimizers import Adam
+from PIL import Image
+from keras.models import load_model
 
-BASE_DIR = 'weights/'
+BASE_DIR = 'weights1/'
+RESHAPE = (256,256)
+def preprocess_image(cv_img):
+    cv_img = cv_img.resize(RESHAPE)
+    img = np.array(cv_img)
+    img = (img - 127.5) / 127.5
+    return img
 
+def load_batch(images):
+    images_n = []
+    for im in images:
+        #print(im)
+        img = Image.open(im)
+        images_n.append(preprocess_image(img))
+    return np.array(images_n)
 
 def save_all_weights(d, g, epoch_number, current_loss):
     now = datetime.datetime.now()
@@ -22,11 +36,15 @@ def save_all_weights(d, g, epoch_number, current_loss):
 
 
 def train_multiple_outputs(n_images, batch_size, epoch_num, critic_updates=5):
-    data = load_images('./images/train', n_images)
-    y_train, x_train = data['B'], data['A']
-
+    #data = load_images('/home/turing/td/', n_images)
+    y_train = sorted(glob.glob('/home/turing/td/data/*.png'))
+    x_train = sorted(glob.glob('/home/turing/td/blur/*.png'))
+    print('loaded_data')
     g = generator_model()
+    g.load_weights('weights/424/generator_19_290.h5')
     d = discriminator_model()
+    d.load_weights('weights/424/discriminator_19.h5')
+    
     d_on_g = generator_containing_discriminator_multiple_outputs(g, d)
 
     d_opt = Adam(lr=1E-4, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
@@ -44,16 +62,22 @@ def train_multiple_outputs(n_images, batch_size, epoch_num, critic_updates=5):
 
     for epoch in range(epoch_num):
         print('epoch: {}/{}'.format(epoch, epoch_num))
-        print('batches: {}'.format(x_train.shape[0] / batch_size))
+        print('batches: {}'.format(len(x_train) / batch_size))
 
-        permutated_indexes = np.random.permutation(x_train.shape[0])
+        permutated_indexes = np.random.permutation(len(x_train))
 
         d_losses = []
         d_on_g_losses = []
-        for index in range(int(x_train.shape[0] / batch_size)):
+        for index in range(int(len(x_train)/ batch_size)):
             batch_indexes = permutated_indexes[index*batch_size:(index+1)*batch_size]
-            image_blur_batch = x_train[batch_indexes]
-            image_full_batch = y_train[batch_indexes]
+            x_t = []
+            y_t = []
+            for i in batch_indexes:
+                x_t.append(x_train[i])
+                y_t.append(y_train[i])
+            image_blur_batch = load_batch(x_t)
+            image_full_batch = load_batch(y_t)
+            
 
             generated_images = g.predict(x=image_blur_batch, batch_size=batch_size)
 
@@ -79,9 +103,9 @@ def train_multiple_outputs(n_images, batch_size, epoch_num, critic_updates=5):
 
 
 @click.command()
-@click.option('--n_images', default=-1, help='Number of images to load for training')
+@click.option('--n_images', default=1000000, help='Number of images to load for training')
 @click.option('--batch_size', default=16, help='Size of batch')
-@click.option('--epoch_num', default=4, help='Number of epochs for training')
+@click.option('--epoch_num', default=20, help='Number of epochs for training')
 @click.option('--critic_updates', default=5, help='Number of discriminator training')
 def train_command(n_images, batch_size, epoch_num, critic_updates):
     return train_multiple_outputs(n_images, batch_size, epoch_num, critic_updates)
